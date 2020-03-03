@@ -50,8 +50,12 @@ class Tests3 {
         val certSfEntry = zipFile.getEntry("META-INF/CERT.SF")
         val certSF = Manifest(zipFile.getInputStream(certSfEntry))
         val certSFEntries = certSF.entries.keys.toSet()
-
         Assert.assertEquals(certSFEntries, manifestMfEntries)
+
+        val sha256Base64OfManifestMfExpected = certSF.mainAttributes.getValue("SHA-256-Digest-Manifest")
+        val sha256ActualOfManifestMf = Utils.getSHA256(zipFile.getInputStream(manifestMfEntry))
+        val sha256Base64OfManifestMfActual = Utils.toBase64(sha256ActualOfManifestMf)
+        Assert.assertEquals(sha256Base64OfManifestMfExpected, sha256Base64OfManifestMfActual)
 
         for(key in manifestMfEntries) {
             val entryFromManifestMF = manifestMF.entries[key]!!
@@ -69,14 +73,6 @@ class Tests3 {
         println("*** check_certSF_vs_ManifestMF()")
     }
 
-    /*
-    Certificate fingerprints:
-         MD5:  28:DE:25:1A:44:05:DF:91:08:AC:59:C8:CB:7F:32:2C
-         SHA1: 60:98:23:BA:ED:39:9D:9A:97:13:8D:63:65:50:EB:E8:20:14:CF:2E
-         SHA256: 8A:B1:4F:D7:50:B8:20:57:4D:20:C3:54:41:EA:14:A9:B5:D1:95:9A:31:04:0C:EC:12:B4:6B:B2:90:F4:DA:1B
-         Signature algorithm name: SHA1withRSA
-         Subject Public Key Algorithm: 1024-bit RSA key
-     */
     @Test
     fun check1(){
         val zipFile = ZipFile(TINDER_APK) //of JarFile
@@ -85,16 +81,10 @@ class Tests3 {
         val certSfBytes = zipFile.getInputStream(certSfEntry).readBytes()
 
         val sha256CertSF = Utils.getSHA256(certSfBytes)
-        //32: 3,-76,-64,87,-29,107,-51,28,-118,-91,108,102,30,-65,37,41,-48,-54,127,125,106,-115,-94,-28,-61,33,8,-18,25,-78,-75,-96
         val sha256Base64CertSF = Utils.toBase64(sha256CertSF)
-        //44: A7TAV+NrzRyKpWxmHr8lKdDKf31qjaLkwyEI7hmytaA=
-        //44: 65,55,84,65,86,43,78,114,122,82,121,75,112,87,120,109,72,114,56,108,75,100,68,75,102,51,49,113,106,97,76,107,119,121,69,73,55,104,109,121,116,97,65,61
 
         val sha1CertSF = Utils.getSHA1(certSfBytes)
-        //20: -104,-87,-47,29,-12,35,-31,-40,114,-63,105,87,-3,16,-34,63,117,8,-52,84
         val sha1Base64CertSF = Utils.toBase64(sha1CertSF)
-        //28: mKnRHfQj4dhywWlX/RDeP3UIzFQ=
-        //28: 109,75,110,82,72,102,81,106,52,100,104,121,119,87,108,88,47,82,68,101,80,51,85,73,122,70,81,61
 
         val certRsaEntry = zipFile.getEntry("META-INF/CERT.RSA")
         val certRsaInputStream = zipFile.getInputStream(certRsaEntry)
@@ -109,10 +99,6 @@ class Tests3 {
             println("publicKey.encoded SHA256 + BASE64: "+ Utils.toHex(Utils.getSHA256(publicKey.encoded)))
             println("publicKey.encoded SHA1 + BASE64: "+ Utils.toHex(Utils.getSHA1(publicKey.encoded)))
 
-//            println("SHA256 (encoded): "+ Utils.toHex(Utils.getSHA256(this.encoded))) //32 byte
-//            println("publicKey.encoded: "+ Arrays.toString(publicKey.encoded)) //294 byte
-//             println("Signature.data: " + Arrays.toString(this.signature))
-
             val cipher = Cipher.getInstance("RSA")
             cipher.init(Cipher.DECRYPT_MODE, publicKey)
             val result = cipher.doFinal(this.signature)
@@ -124,4 +110,19 @@ class Tests3 {
     }
 }
 
+/*
+Certificate fingerprints:
+MD5:  28:DE:25:1A:44:05:DF:91:08:AC:59:C8:CB:7F:32:2C
+SHA1: 60:98:23:BA:ED:39:9D:9A:97:13:8D:63:65:50:EB:E8:20:14:CF:2E
+SHA256: 8A:B1:4F:D7:50:B8:20:57:4D:20:C3:54:41:EA:14:A9:B5:D1:95:9A:31:04:0C:EC:12:B4:6B:B2:90:F4:DA:1B
+Signature algorithm name: SHA1withRSA
+Subject Public Key Algorithm: 1024-bit RSA key
 
+SHA256 (CERT.SF) 32: 3,-76,-64,87,-29,107,-51,28,-118,-91,108,102,30,-65,37,41,-48,-54,127,125,106,-115,-94,-28,-61,33,8,-18,25,-78,-75,-96
+Base64 String = 44: A7TAV+NrzRyKpWxmHr8lKdDKf31qjaLkwyEI7hmytaA=
+44: 65,55,84,65,86,43,78,114,122,82,121,75,112,87,120,109,72,114,56,108,75,100,68,75,102,51,49,113,106,97,76,107,119,121,69,73,55,104,109,121,116,97,65,61
+
+SHA1 (CERT.SF)  20: -104,-87,-47,29,-12,35,-31,-40,114,-63,105,87,-3,16,-34,63,117,8,-52,84
+Base64 String = 28: mKnRHfQj4dhywWlX/RDeP3UIzFQ=
+28: 109,75,110,82,72,102,81,106,52,100,104,121,119,87,108,88,47,82,68,101,80,51,85,73,122,70,81,61
+ */
