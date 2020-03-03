@@ -73,8 +73,11 @@ class Tests3 {
         println("*** check_certSF_vs_ManifestMF()")
     }
 
+    /*
+    I've tested with SHA256, SHA1 & the values just don't match with what I read from CERT.RSA
+     */
     @Test
-    fun check1(){
+    fun check_certRsa(){
         val zipFile = ZipFile(TINDER_APK) //of JarFile
 
         val certSfEntry = zipFile.getEntry("META-INF/CERT.SF")
