@@ -1,12 +1,17 @@
 import junit.framework.Assert
 import org.junit.Test
+import sun.security.pkcs.PKCS7
+import sun.security.x509.AlgorithmId
 import sun.security.x509.X509CertImpl
+import java.security.KeyPairGenerator
+import java.security.Signature
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
 import java.util.jar.Manifest
 import java.util.zip.ZipFile
 import javax.crypto.Cipher
+
 
 private const val EXPECTED_FORMATTED_ENTRY_ANDROID_MANIFEST =
     "Name: AndroidManifest.xml\r\nSHA-256-Digest: Mn0EqrCsBqzJcKpag+kBF+521SwCsH8GQZsyftQZ9D4=\r\n\r\n"
@@ -73,59 +78,26 @@ class Tests3 {
         println("*** check_certSF_vs_ManifestMF()")
     }
 
-    /*
-    I've tested with SHA256, SHA1 & the values just don't match with what I read from CERT.RSA
-     */
     @Test
     fun check_certRsa(){
-        val zipFile = ZipFile(TINDER_APK) //of JarFile
+        val zipFile = ZipFile(TINDER_APK) //or JarFile
 
         val certSfEntry = zipFile.getEntry("META-INF/CERT.SF")
         val certSfBytes = zipFile.getInputStream(certSfEntry).readBytes()
 
-        val sha256CertSF = Utils.getSHA256(certSfBytes)
-        val sha256Base64CertSF = Utils.toBase64(sha256CertSF)
-
-        val sha1CertSF = Utils.getSHA1(certSfBytes)
-        val sha1Base64CertSF = Utils.toBase64(sha1CertSF)
-
         val certRsaEntry = zipFile.getEntry("META-INF/CERT.RSA")
-        val certRsaInputStream = zipFile.getInputStream(certRsaEntry)
         val certFactory = CertificateFactory.getInstance("X.509")
-        val certificate: X509Certificate = certFactory.generateCertificates(certRsaInputStream).first() as X509Certificate
+        val certificate: X509Certificate = certFactory.generateCertificates(zipFile.getInputStream(certRsaEntry)).first() as X509Certificate
 
-        with(certificate) {
-            //or "SHA-256" or "MD5"
-            println("fingerprint SHA1: "+ (this as X509CertImpl).getFingerprint("SHA1")) //609823BAED399D9A97138D636550EBE82014CF2E
+        val sigBlock: PKCS7 = PKCS7(zipFile.getInputStream(certRsaEntry).readBytes())
+        val encryptedDigest = sigBlock.signerInfos[0].encryptedDigest
+        val algorithmName = AlgorithmId.makeSigAlg("SHA256", "RSA")
+        val signature = Signature.getInstance(algorithmName)
+        signature.initVerify(certificate.publicKey)
+        signature.update(certSfBytes)
+        val verify = signature.verify(encryptedDigest)
 
-            println("publicKey.encoded: "+ Arrays.toString(publicKey.encoded)) //294 byte
-            println("publicKey.encoded SHA256 + BASE64: "+ Utils.toHex(Utils.getSHA256(publicKey.encoded)))
-            println("publicKey.encoded SHA1 + BASE64: "+ Utils.toHex(Utils.getSHA1(publicKey.encoded)))
-
-            val cipher = Cipher.getInstance("RSA")
-            cipher.init(Cipher.DECRYPT_MODE, publicKey)
-            val result = cipher.doFinal(this.signature)
-            //35: 48,33,48,9,6,5,43,14,3,2,26,5,0,4,20,-33,108,-44,-110,18,60,16,-76,-66,-21,-7,-22,-21,34,-77,70,19,-67,52,-72
-
-            println("signature -> DEC.data " + Arrays.toString(result))
-        }
-        println("*** check1()")
+        Assert.assertEquals(true, verify)
+        println("*** check_certRsa()")
     }
 }
-
-/*
-Certificate fingerprints:
-MD5:  28:DE:25:1A:44:05:DF:91:08:AC:59:C8:CB:7F:32:2C
-SHA1: 60:98:23:BA:ED:39:9D:9A:97:13:8D:63:65:50:EB:E8:20:14:CF:2E
-SHA256: 8A:B1:4F:D7:50:B8:20:57:4D:20:C3:54:41:EA:14:A9:B5:D1:95:9A:31:04:0C:EC:12:B4:6B:B2:90:F4:DA:1B
-Signature algorithm name: SHA1withRSA
-Subject Public Key Algorithm: 1024-bit RSA key
-
-SHA256 (CERT.SF) 32: 3,-76,-64,87,-29,107,-51,28,-118,-91,108,102,30,-65,37,41,-48,-54,127,125,106,-115,-94,-28,-61,33,8,-18,25,-78,-75,-96
-Base64 String = 44: A7TAV+NrzRyKpWxmHr8lKdDKf31qjaLkwyEI7hmytaA=
-44: 65,55,84,65,86,43,78,114,122,82,121,75,112,87,120,109,72,114,56,108,75,100,68,75,102,51,49,113,106,97,76,107,119,121,69,73,55,104,109,121,116,97,65,61
-
-SHA1 (CERT.SF)  20: -104,-87,-47,29,-12,35,-31,-40,114,-63,105,87,-3,16,-34,63,117,8,-52,84
-Base64 String = 28: mKnRHfQj4dhywWlX/RDeP3UIzFQ=
-28: 109,75,110,82,72,102,81,106,52,100,104,121,119,87,108,88,47,82,68,101,80,51,85,73,122,70,81,61
- */
