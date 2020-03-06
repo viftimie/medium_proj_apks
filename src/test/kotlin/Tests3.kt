@@ -86,10 +86,9 @@ class Tests3 {
         val certSfBytes = zipFile.getInputStream(certSfEntry).readBytes()
 
         val certRsaEntry = zipFile.getEntry("META-INF/CERT.RSA")
-        val certFactory = CertificateFactory.getInstance("X.509")
-        val certificate: X509Certificate = certFactory.generateCertificates(zipFile.getInputStream(certRsaEntry)).first() as X509Certificate
 
         val sigBlock: PKCS7 = PKCS7(zipFile.getInputStream(certRsaEntry).readBytes())
+        val certificate: X509Certificate = sigBlock.certificates[0]
         val encryptedDigest = sigBlock.signerInfos[0].encryptedDigest
         val algorithmName = AlgorithmId.makeSigAlg("SHA256", "RSA")
         val signature = Signature.getInstance(algorithmName)
